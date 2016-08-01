@@ -1,0 +1,13 @@
+version: 1.0.{build}
+image: Visual Studio 2015
+configuration: Release
+platform: Any CPU
+install:
+  - nuget install redis-64 -excludeversion
+  - redis-64\tools\redis-server.exe --service-install
+  - redis-64\tools\redis-server.exe --service-start
+  - '@ECHO Redis Started'
+build_script:
+- cmd: build.cmd Build
+test_script:
+- cmd: build.cmd RunTests
