@@ -49,7 +49,7 @@ namespace Akka.Persistence.AzureTable
         {
             system.Settings.InjectTopLevelFallback(DefaultConfig());
 
-            JournalSettings = AzureTableSettings.Create(system.Settings.Config.GetConfig("akka.persistence.journal.azure-table"));
+            JournalSettings = AzureTableSettings.Create(DefaultConfig());
         }
     }
 
