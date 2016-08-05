@@ -5,27 +5,29 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-
-using System;
-using System.Configuration;
+using System.Collections.Generic;
 using System.Linq;
-using StackExchange.Redis;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
 
 namespace Akka.Persistence.AzureTable.Tests
 {
     public static class DbUtils
     {
-        public static void Clean(string keyPrefix)
+        public static void Clean(string connectionString, string tableName)
         {
-            var connectionString = ConfigurationManager.ConnectionStrings["redis"].ConnectionString;
-            var database = Convert.ToInt32(ConfigurationManager.AppSettings["redisDatabase"]);
-
-            var redisConnection = ConnectionMultiplexer.Connect(connectionString);
-            var server = redisConnection.GetServer(redisConnection.GetEndPoints().First());
-            var db = redisConnection.GetDatabase(database);
-            foreach (var key in server.Keys(database: database, pattern: $"{keyPrefix}:*"))
+            CloudTableClient tableClient = CloudStorageAccount.Parse(connectionString).CreateCloudTableClient();
+            CloudTable table = tableClient.GetTableReference(tableName);
+            TableQuery<DynamicTableEntity> query = new TableQuery<DynamicTableEntity>();
+            IEnumerable<DynamicTableEntity> results = table.ExecuteQuery(query);
+            if (results.Count() > 0)
             {
-                db.KeyDelete(key);
+                TableBatchOperation batchOperation = new TableBatchOperation();
+                foreach (DynamicTableEntity s in results)
+                {
+                    batchOperation.Delete(s);
+                }
+                table.ExecuteBatch(batchOperation);
             }
         }
     }

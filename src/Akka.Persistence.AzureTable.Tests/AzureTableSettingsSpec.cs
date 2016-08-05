@@ -16,11 +16,12 @@ namespace Akka.Persistence.AzureTable.Tests
         [Fact]
         public void AzureTable_JournalSettings_must_have_default_values()
         {
-            var redisPersistence = AzureTablePersistence.Get(Sys);
+            var azurePersistence = AzureTablePersistence.Get(Sys);
 
-            redisPersistence.JournalSettings.ConnectionString.Should().Be("UseDevelopmentStorage=true");
-            redisPersistence.JournalSettings.TableName.Should().Be("events");
-            redisPersistence.JournalSettings.AutoInitialize.Should().BeTrue();
+            azurePersistence.JournalSettings.ConnectionString.Should().Be("UseDevelopmentStorage=true");
+            azurePersistence.JournalSettings.TableName.Should().Be("events");
+            azurePersistence.JournalSettings.MetadataTableName.Should().Be("metadata");
+            azurePersistence.JournalSettings.AutoInitialize.Should().BeFalse();
         }
     }
 }

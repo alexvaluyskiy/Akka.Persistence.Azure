@@ -13,16 +13,19 @@ namespace Akka.Persistence.AzureTable
 {
     public class AzureTableSettings
     {
-        public AzureTableSettings(string connectionString, string tableName, bool autoInitialize)
+        public AzureTableSettings(string connectionString, string tableName, string metadataTableName, bool autoInitialize)
         {
             ConnectionString = connectionString;
             TableName = tableName;
+            MetadataTableName = metadataTableName;
             AutoInitialize = autoInitialize;
         }
 
         public string ConnectionString { get; }
 
         public string TableName { get; }
+
+        public string MetadataTableName { get; }
 
         public bool AutoInitialize { get; }
 
@@ -34,6 +37,7 @@ namespace Akka.Persistence.AzureTable
             return new AzureTableSettings(
                 connectionString: config.GetString("connection-string"),
                 tableName: config.GetString("table-name"),
+                metadataTableName: config.GetString("metadata-table-name"),
                 autoInitialize: config.GetBoolean("auto-initialize"));
         }
     }
@@ -49,7 +53,7 @@ namespace Akka.Persistence.AzureTable
         {
             system.Settings.InjectTopLevelFallback(DefaultConfig());
 
-            JournalSettings = AzureTableSettings.Create(DefaultConfig());
+            JournalSettings = AzureTableSettings.Create(system.Settings.Config.GetConfig("akka.persistence.journal.azure-table"));
         }
     }
 

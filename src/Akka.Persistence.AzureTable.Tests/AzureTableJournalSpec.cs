@@ -1,11 +1,10 @@
 ﻿//-----------------------------------------------------------------------
-// <copyright file="RedisJournalSpec.cs" company="Akka.NET Project">
+// <copyright file="AzureTableJournalSpec.cs" company="Akka.NET Project">
 //     Copyright (C) 2009-2016 Lightbend Inc. <http://www.lightbend.com>
 //     Copyright (C) 2013-2016 Akka.NET project <https://github.com/akkadotnet/akka.net>
 // </copyright>
 //-----------------------------------------------------------------------
 
-using System.Configuration;
 using Akka.Configuration;
 using Akka.Persistence.TestKit.Journal;
 using Xunit;
@@ -17,30 +16,19 @@ namespace Akka.Persistence.AzureTable.Tests
     public class AzureTableJournalSpec : JournalSpec
     {
         private static readonly Config SpecConfig;
-        private static readonly string KeyPrefix;
 
         static AzureTableJournalSpec()
         {
-            var connectionString = ConfigurationManager.ConnectionStrings["redis"].ConnectionString;
-            var database = ConfigurationManager.AppSettings["redisDatabase"];
-
             SpecConfig = ConfigurationFactory.ParseString(@"
-                akka.test.single-expect-default = 3s
+                akka.test.single-expect-default = 50s
                 akka.persistence {
                     publish-plugin-commands = on
-                    journal {
-                        plugin = ""akka.persistence.journal.redis""
-                        redis {
-                            class = ""Akka.Persistence.Redis.Journal.RedisJournal, Akka.Persistence.Redis""
-                            configuration-string = """ + connectionString + @"""
-                            plugin-dispatcher = ""akka.actor.default-dispatcher""
-                            database = """ + database + @"""
-                            key-prefix = ""akka:persistence:journal""
-                        }
-                    }
+                    journal.plugin = ""akka.persistence.journal.azure-table""
+                    journal.azure-table.connection-string = ""UseDevelopmentStorage=true""
+                    journal.azure-table.auto-initialize = on
+                    journal.azure-table.table-name = events3
+                    journal.azure-table.metadata-table-name = metadata3
                 }");
-
-            KeyPrefix = SpecConfig.GetString("akka.persistence.journal.redis.key-prefix");
         }
 
         public AzureTableJournalSpec(ITestOutputHelper output)
@@ -55,7 +43,9 @@ namespace Akka.Persistence.AzureTable.Tests
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            DbUtils.Clean(KeyPrefix);
+            DbUtils.Clean(
+                SpecConfig.GetString("akka.persistence.journal.azure-table.connection-string"), 
+                SpecConfig.GetString("akka.persistence.journal.azure-table.table-name"));
         }
     }
 }

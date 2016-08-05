@@ -12,17 +12,16 @@ using System.Linq;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Persistence.Journal;
-using Akka.Serialization;
-using Akka.Util.Internal;
-using StackExchange.Redis;
+using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Table;
+using Newtonsoft.Json;
 
 namespace Akka.Persistence.AzureTable.Journal
 {
     public class AzureTableJournal : AsyncWriteJournal
     {
         private readonly AzureTableSettings _settings;
-        private Lazy<Serializer> _serializer;
-        private Lazy<IDatabase> _database;
+        private Lazy<CloudTableClient> _client;
         private ActorSystem _system;
 
         public AzureTableJournal()
@@ -34,12 +33,18 @@ namespace Akka.Persistence.AzureTable.Journal
         {
             base.PreStart();
             _system = Context.System;
-            _database = new Lazy<IDatabase>(() =>
+            _client = new Lazy<CloudTableClient>(() =>
             {
-                var redisConnection = ConnectionMultiplexer.Connect(_settings.ConnectionString);
-                return redisConnection.GetDatabase(0);
+                CloudTableClient tableClient = CloudStorageAccount.Parse(_settings.ConnectionString).CreateCloudTableClient();
+
+                if (_settings.AutoInitialize)
+                {
+                    tableClient.GetTableReference(_settings.TableName).CreateIfNotExists();
+                    tableClient.GetTableReference(_settings.MetadataTableName).CreateIfNotExists();
+                }
+
+                return tableClient;
             });
-            _serializer = new Lazy<Serializer>(() => new NewtonSoftJsonSerializer(_system.AsInstanceOf<ExtendedActorSystem>()));
         }
 
         public override async Task ReplayMessagesAsync(
@@ -50,23 +55,51 @@ namespace Akka.Persistence.AzureTable.Journal
             long max,
             Action<IPersistentRepresentation> recoveryCallback)
         {
-            RedisValue[] journals = await _database.Value.SortedSetRangeByScoreAsync(GetJournalKey(persistenceId), fromSequenceNr, toSequenceNr, skip: 0L, take: max);
-
-            foreach (var journal in journals)
+            long count = 0;
+            if (max > 0 && (toSequenceNr - fromSequenceNr) >= 0)
             {
-                recoveryCallback(ToPersistenceRepresentation(_serializer.Value.FromBinary<JournalEntry>(journal), context.Sender));
+                IEnumerable<JournalEntry> results = _client.Value
+                    .GetTableReference(_settings.TableName)
+                    .ExecuteQuery(BuildReplayTableQuery(persistenceId, fromSequenceNr, toSequenceNr));
+
+                foreach (JournalEntry @event in results)
+                {
+                    recoveryCallback(ToPersistenceRepresentation(@event, Context.Self));
+                    count++;
+                    if (count == max) return;
+                }
             }
         }
 
         public override async Task<long> ReadHighestSequenceNrAsync(string persistenceId, long fromSequenceNr)
         {
-            var highestSequenceNr = await _database.Value.StringGetAsync(GetHighestSequenceNrKey(persistenceId));
-            return highestSequenceNr.IsNull ? 0L : (long)highestSequenceNr;
+            var table = _client.Value.GetTableReference(_settings.MetadataTableName);
+
+            var query = table.CreateQuery<MetadataEntry>()
+                .Where(c => c.PersistenceId == persistenceId)
+                .Select(c => c.SequenceNr)
+                .FirstOrDefault();
+
+            return query;
         }
 
         protected override async Task DeleteMessagesToAsync(string persistenceId, long toSequenceNr)
         {
-            await _database.Value.SortedSetRemoveRangeByScoreAsync(GetJournalKey(persistenceId), -1, toSequenceNr);
+            IEnumerable<JournalEntry> results = _client.Value
+                    .GetTableReference(_settings.TableName)
+                    .ExecuteQuery(BuildDeleteTableQuery(persistenceId, toSequenceNr)).OrderByDescending(t => t.SequenceNr);
+
+            if (results.Any())
+            {
+                TableBatchOperation batchOperation = new TableBatchOperation();
+
+                foreach (JournalEntry s in results)
+                {
+                    batchOperation.Delete(s);
+                }
+
+                await _client.Value.GetTableReference(_settings.TableName).ExecuteBatchAsync(batchOperation);
+            }
         }
 
         protected override async Task<IImmutableList<Exception>> WriteMessagesAsync(IEnumerable<AtomicWrite> messages)
@@ -76,20 +109,17 @@ namespace Akka.Persistence.AzureTable.Journal
             {
                 var persistentMessages = ((IImmutableList<IPersistentRepresentation>)message.Payload).ToArray();
 
-                var transaction = _database.Value.CreateTransaction();
+                var batchOperation = new TableBatchOperation();
 
                 foreach (var write in persistentMessages)
                 {
-                    transaction.SortedSetAddAsync(GetJournalKey(write.PersistenceId), _serializer.Value.ToBinary(ToJournalEntry(write)), write.SequenceNr);
+                    batchOperation.Insert(ToJournalEntry(write));
                 }
 
-                if (!await transaction.ExecuteAsync())
-                {
-                    throw new Exception($"{nameof(WriteMessagesAsync)}: failed to write {typeof(JournalEntry).Name} to redis");
-                }
+                await _client.Value.GetTableReference(_settings.TableName).ExecuteBatchAsync(batchOperation);
             });
 
-            await SetHighSequenceId(messageList);
+            // await SetHighestSequenceId(messageList);
 
             return await Task<IImmutableList<Exception>>
                 .Factory
@@ -97,36 +127,47 @@ namespace Akka.Persistence.AzureTable.Journal
                     tasks => tasks.Select(t => t.IsFaulted ? TryUnwrapException(t.Exception) : null).ToImmutableList());
         }
 
-        private async Task SetHighSequenceId(IList<AtomicWrite> messages)
+        private async Task SetHighestSequenceId(IList<AtomicWrite> messages)
         {
             var persistenceId = messages.Select(c => c.PersistenceId).First();
             var highSequenceId = messages.Max(c => c.HighestSequenceNr);
 
-            await _database.Value.StringSetAsync(GetHighestSequenceNrKey(persistenceId), highSequenceId);
+            var metadata = new MetadataEntry(persistenceId, highSequenceId);
+
+            await _client.Value.GetTableReference(_settings.MetadataTableName).ExecuteAsync(TableOperation.Replace(metadata));
         }
 
-        private RedisKey GetJournalKey(string persistenceId) => $"{_settings.TableName}:{persistenceId}";
-
-        private RedisKey GetHighestSequenceNrKey(string persistenceId)
+        private static TableQuery<JournalEntry> BuildReplayTableQuery(string persistenceId, long fromSequenceNr, long toSequenceNr)
         {
-            return $"{GetJournalKey(persistenceId)}.highestSequenceNr";
+            return new TableQuery<JournalEntry>().Where(
+                                TableQuery.CombineFilters(TableQuery.CombineFilters(
+                                    TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, persistenceId),
+                                    TableOperators.And,
+                                    TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.GreaterThanOrEqual, JournalEntry.ToRowKey(fromSequenceNr))),
+                                TableOperators.And,
+                                TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, JournalEntry.ToRowKey(toSequenceNr))));
+        }
+
+        private static TableQuery<JournalEntry> BuildDeleteTableQuery(string persistenceId, long sequenceNr)
+        {
+            return new TableQuery<JournalEntry>().Where(
+                        TableQuery.CombineFilters(
+                                TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, persistenceId),
+                                TableOperators.And,
+                                TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, JournalEntry.ToRowKey(sequenceNr))));
         }
 
         private JournalEntry ToJournalEntry(IPersistentRepresentation message)
         {
-            return new JournalEntry
-            {
-                PersistenceId = message.PersistenceId,
-                SequenceNr = message.SequenceNr,
-                IsDeleted = message.IsDeleted,
-                Payload = message.Payload,
-                Manifest = message.Manifest
-            };
+            var id = Guid.NewGuid().ToString();
+            var payload = JsonConvert.SerializeObject(message.Payload);
+            return new JournalEntry(id, message.PersistenceId, message.SequenceNr, message.IsDeleted, payload, message.Manifest);
         }
 
         private Persistent ToPersistenceRepresentation(JournalEntry entry, IActorRef sender)
         {
-            return new Persistent(entry.Payload, entry.SequenceNr, entry.PersistenceId, entry.Manifest, entry.IsDeleted, sender);
+            var payload = JsonConvert.DeserializeObject(entry.Payload);
+            return new Persistent(payload, entry.SequenceNr, entry.PersistenceId, entry.Manifest, entry.IsDeleted, sender);
         }
     }
 }
