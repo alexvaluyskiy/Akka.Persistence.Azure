@@ -47,6 +47,7 @@ namespace Akka.Persistence.AzureTable.Journal
             });
         }
 
+        // TODO: optimize query here
         public override async Task ReplayMessagesAsync(
             IActorContext context,
             string persistenceId,
@@ -71,6 +72,7 @@ namespace Akka.Persistence.AzureTable.Journal
             }
         }
 
+        // TODO: optimize query here
         public override async Task<long> ReadHighestSequenceNrAsync(string persistenceId, long fromSequenceNr)
         {
             var table = _client.Value.GetTableReference(_settings.MetadataTableName);
@@ -119,7 +121,7 @@ namespace Akka.Persistence.AzureTable.Journal
                 await _client.Value.GetTableReference(_settings.TableName).ExecuteBatchAsync(batchOperation);
             });
 
-            // await SetHighestSequenceId(messageList);
+            await SetHighestSequenceId(messageList);
 
             return await Task<IImmutableList<Exception>>
                 .Factory
@@ -127,14 +129,25 @@ namespace Akka.Persistence.AzureTable.Journal
                     tasks => tasks.Select(t => t.IsFaulted ? TryUnwrapException(t.Exception) : null).ToImmutableList());
         }
 
+        // TODO: optimize query here
         private async Task SetHighestSequenceId(IList<AtomicWrite> messages)
         {
             var persistenceId = messages.Select(c => c.PersistenceId).First();
             var highSequenceId = messages.Max(c => c.HighestSequenceNr);
 
-            var metadata = new MetadataEntry(persistenceId, highSequenceId);
+            var table = _client.Value.GetTableReference(_settings.MetadataTableName);
 
-            await _client.Value.GetTableReference(_settings.MetadataTableName).ExecuteAsync(TableOperation.Replace(metadata));
+            var metadata = table.CreateQuery<MetadataEntry>().Where(c => c.PersistenceId == persistenceId).FirstOrDefault();
+
+            if (metadata == null)
+            {
+                await table.ExecuteAsync(TableOperation.Insert(new MetadataEntry(persistenceId, highSequenceId)));
+            }
+            else
+            {
+                metadata.SequenceNr = highSequenceId;
+                await table.ExecuteAsync(TableOperation.InsertOrReplace(metadata));
+            }
         }
 
         private static TableQuery<JournalEntry> BuildReplayTableQuery(string persistenceId, long fromSequenceNr, long toSequenceNr)
@@ -159,9 +172,8 @@ namespace Akka.Persistence.AzureTable.Journal
 
         private JournalEntry ToJournalEntry(IPersistentRepresentation message)
         {
-            var id = Guid.NewGuid().ToString();
             var payload = JsonConvert.SerializeObject(message.Payload);
-            return new JournalEntry(id, message.PersistenceId, message.SequenceNr, message.IsDeleted, payload, message.Manifest);
+            return new JournalEntry(message.PersistenceId, message.SequenceNr, message.IsDeleted, payload, message.Manifest);
         }
 
         private Persistent ToPersistenceRepresentation(JournalEntry entry, IActorRef sender)

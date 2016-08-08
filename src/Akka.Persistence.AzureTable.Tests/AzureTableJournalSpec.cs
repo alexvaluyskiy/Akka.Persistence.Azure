@@ -16,6 +16,9 @@ namespace Akka.Persistence.AzureTable.Tests
     public class AzureTableJournalSpec : JournalSpec
     {
         private static readonly Config SpecConfig;
+        private static string connectionString;
+        private static string tableName;
+        private static string metadataTableName;
 
         static AzureTableJournalSpec()
         {
@@ -26,9 +29,13 @@ namespace Akka.Persistence.AzureTable.Tests
                     journal.plugin = ""akka.persistence.journal.azure-table""
                     journal.azure-table.connection-string = ""UseDevelopmentStorage=true""
                     journal.azure-table.auto-initialize = on
-                    journal.azure-table.table-name = events3
-                    journal.azure-table.metadata-table-name = metadata3
+                    journal.azure-table.table-name = events
+                    journal.azure-table.metadata-table-name = metadata
                 }");
+
+            connectionString = SpecConfig.GetString("akka.persistence.journal.azure-table.connection-string");
+            tableName = SpecConfig.GetString("akka.persistence.journal.azure-table.table-name");
+            metadataTableName = SpecConfig.GetString("akka.persistence.journal.azure-table.metadata-table-name");
         }
 
         public AzureTableJournalSpec(ITestOutputHelper output)
@@ -43,9 +50,8 @@ namespace Akka.Persistence.AzureTable.Tests
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            DbUtils.Clean(
-                SpecConfig.GetString("akka.persistence.journal.azure-table.connection-string"), 
-                SpecConfig.GetString("akka.persistence.journal.azure-table.table-name"));
+            DbUtils.Clean(connectionString, tableName);
+            DbUtils.Clean(connectionString, metadataTableName);
         }
     }
 }

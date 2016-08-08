@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+using System;
 using Microsoft.WindowsAzure.Storage.Table;
 
 namespace Akka.Persistence.AzureTable.Journal
@@ -18,8 +19,8 @@ namespace Akka.Persistence.AzureTable.Journal
 
         public MetadataEntry(string persistenceId, long sequenceNr)
         {
-            PersistenceId = persistenceId;
-            RowKey = ToRowKey(sequenceNr);
+            PartitionKey = persistenceId;
+            RowKey = persistenceId;
 
             PersistenceId = persistenceId;
             SequenceNr = sequenceNr;
@@ -28,10 +29,5 @@ namespace Akka.Persistence.AzureTable.Journal
         public string PersistenceId { get; set; }
 
         public long SequenceNr { get; set; }
-
-        public static string ToRowKey(long version)
-        {
-            return version.ToString().PadLeft(10, '0');
-        }
     }
 }
