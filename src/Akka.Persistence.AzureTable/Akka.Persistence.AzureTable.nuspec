@@ -6,7 +6,7 @@
     <version>@build.number@</version>
     <authors>@authors@</authors>
     <owners>@authors@</owners>
-    <description>Akka.NET Persistence journal backed by Azure Table Storage.</description>
+    <description>Azure Storage Table backend for Akka.Persistence.</description>
     <licenseUrl>https://github.com/akkadotnet/akka.net/blob/master/LICENSE</licenseUrl>
     <projectUrl>https://github.com/alexvaluyskiy/Akka.Persistence.Azure</projectUrl>
     <iconUrl>http://getakka.net/images/AkkaNetLogo.Normal.png</iconUrl>
