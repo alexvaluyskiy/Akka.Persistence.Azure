@@ -92,6 +92,9 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\SharedAssemblyInfo.cs">
+      <Link>Properties\SharedAssemblyInfo.cs</Link>
+    </Compile>
     <Compile Include="Journal\JournalEntry.cs" />
     <Compile Include="Journal\AzureTableJournal.cs" />
     <Compile Include="Journal\MetadataEntry.cs" />

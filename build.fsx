@@ -103,7 +103,7 @@ Target "CopyOutput" <| fun _ ->
         let src = "src" @@ project @@ @"bin/Release/"
         let dst = binDir @@ project
         CopyDir dst src allFiles
-    [ "Akka.Persistence.Redis"
+    [ "Akka.Persistence.Azure"
       ]
     |> List.iter copyOutput
 
@@ -154,43 +154,6 @@ module Nuget =
 
 open Nuget
 open NuGet.Update
-
-//--------------------------------------------------------------------------------
-// Upgrade nuget package versions for dev and production
-
-let updateNugetPackages _ =
-  printfn "Updating NuGet dependencies"
-
-  let getConfigFile preRelease =
-    match preRelease with
-    | true -> "src/.nuget/NuGet.Dev.Config" 
-    | false -> "src/.nuget/NuGet.Config" 
-
-  let getPackages project =
-    match project with
-    | "Akka.Persistence.Azure" -> ["Akka.Persistence";]
-    | "Akka.Persistence.Azure.Tests" -> ["Akka.Persistence.TestKit";]
-    | _ -> []
-
-  for projectFile in !! "src/**/*.csproj" do
-    printfn "Updating packages for %s" projectFile
-    let project = Path.GetFileNameWithoutExtension projectFile
-    let projectDir = Path.GetDirectoryName projectFile
-    let config = projectDir @@ "packages.config"
-
-    NugetUpdate
-        (fun p ->
-                { p with
-                    ConfigFile = Some (getConfigFile isPreRelease)
-                    Prerelease = true
-                    ToolPath = nugetExe
-                    RepositoryPath = "src/Packages"
-                    Ids = getPackages project
-                    }) config
-
-Target "UpdateDependencies" <| fun _ ->
-    printfn "Invoking updateNugetPackages"
-    updateNugetPackages()
 
 //--------------------------------------------------------------------------------
 // Clean nuget directory
@@ -421,7 +384,7 @@ Target "HelpDocs" <| fun _ ->
 //--------------------------------------------------------------------------------
 
 // build dependencies
-"Clean" ==> "AssemblyInfo" ==> "RestorePackages" ==> "UpdateDependencies" ==> "Build" ==> "CopyOutput" ==> "BuildRelease"
+"Clean" ==> "AssemblyInfo" ==> "RestorePackages" ==> "Build" ==> "CopyOutput" ==> "BuildRelease"
 
 // tests dependencies
 "CleanTests" ==> "RunTests"
