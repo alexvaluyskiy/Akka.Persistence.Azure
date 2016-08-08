@@ -1,4 +1,4 @@
-# Akka.Persistence.Azure
+# Akka.Persistence.Azure [![NuGet Pre Release](https://img.shields.io/nuget/vpre/Microsoft.AspNet.Mvc.svg?maxAge=2592000)](https://www.nuget.org/packages/Akka.Persistence.AzureTable/)
 
 Akka Persistence journal and snapshot store backed by Azure Table database.
 
