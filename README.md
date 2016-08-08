@@ -2,7 +2,7 @@
 
 Akka Persistence journal and snapshot store backed by Azure Table database.
 
-### Configuration
+## Configuration
 
 Both journal and snapshot store share the same configuration keys (however they resides in separate scopes, so they are defined distinctly for either journal or snapshot store):
 
@@ -24,9 +24,15 @@ akka.persistence {
 			# table storage table corresponding with persistent journal
 			table-name = events
 
+			# metadata table
+			metadata-table-name = metadata
+
 			# should corresponding journal table be initialized automatically
 			auto-initialize = off
         }
     }    
 }
 ```
+
+## Serialization
+Azure plugin uses Json.Net to serialize all payloads
