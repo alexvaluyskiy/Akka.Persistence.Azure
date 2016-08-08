@@ -23,5 +23,15 @@ namespace Akka.Persistence.AzureTable.Tests
             azurePersistence.JournalSettings.MetadataTableName.Should().Be("metadata");
             azurePersistence.JournalSettings.AutoInitialize.Should().BeFalse();
         }
+
+        [Fact]
+        public void AzureTable_SnapshotStoreSettings_must_have_default_values()
+        {
+            var azurePersistence = AzureTablePersistence.Get(Sys);
+
+            azurePersistence.SnapshotStoreSettings.ConnectionString.Should().Be("UseDevelopmentStorage=true");
+            azurePersistence.SnapshotStoreSettings.TableName.Should().Be("snapshots");
+            azurePersistence.SnapshotStoreSettings.AutoInitialize.Should().BeFalse();
+        }
     }
 }

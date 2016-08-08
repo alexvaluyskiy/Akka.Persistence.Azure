@@ -11,6 +11,7 @@ using Akka.Configuration;
 
 namespace Akka.Persistence.AzureTable
 {
+    // TODO: divide to JournalSettings and to SnapshotStoreSettings
     public class AzureTableSettings
     {
         public AzureTableSettings(string connectionString, string tableName, string metadataTableName, bool autoInitialize)
@@ -49,11 +50,14 @@ namespace Akka.Persistence.AzureTable
 
         public AzureTableSettings JournalSettings { get; }
 
+        public AzureTableSettings SnapshotStoreSettings { get; }
+
         public AzureTablePersistence(ExtendedActorSystem system)
         {
             system.Settings.InjectTopLevelFallback(DefaultConfig());
 
             JournalSettings = AzureTableSettings.Create(system.Settings.Config.GetConfig("akka.persistence.journal.azure-table"));
+            SnapshotStoreSettings = AzureTableSettings.Create(system.Settings.Config.GetConfig("akka.persistence.snapshot-store.azure-table"));
         }
     }
 

@@ -97,6 +97,9 @@
     <Compile Include="Journal\MetadataEntry.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AzureTablePersistence.cs" />
+    <Compile Include="SerializerExtensions.cs" />
+    <Compile Include="Snapshot\AzureSnapshotStore.cs" />
+    <Compile Include="Snapshot\SnapshotEntry.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Akka.Persistence.AzureTable.nuspec" />

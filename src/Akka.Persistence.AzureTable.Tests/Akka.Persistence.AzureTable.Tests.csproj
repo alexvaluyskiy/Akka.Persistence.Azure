@@ -132,6 +132,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AzureTableSnapshotStoreSpec.cs" />
     <Compile Include="DbUtils.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="AzureTableJournalSpec.cs" />
