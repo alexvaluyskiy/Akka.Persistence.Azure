@@ -22,7 +22,7 @@ namespace Akka.Persistence.AzureTable.Tests
         static AzureTableSnapshotStoreSpec()
         {
             SpecConfig = ConfigurationFactory.ParseString(@"
-                akka.test.single-expect-default = 50s
+                akka.test.single-expect-default = 25s
                 akka.persistence {
                     publish-plugin-commands = on
                     snapshot-store.plugin = ""akka.persistence.snapshot-store.azure-table""

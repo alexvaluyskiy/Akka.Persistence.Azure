@@ -23,7 +23,7 @@ namespace Akka.Persistence.AzureTable.Tests
         static AzureTableJournalSpec()
         {
             SpecConfig = ConfigurationFactory.ParseString(@"
-                akka.test.single-expect-default = 3s
+                akka.test.single-expect-default = 25s
                 akka.persistence {
                     publish-plugin-commands = on
                     journal.plugin = ""akka.persistence.journal.azure-table""
