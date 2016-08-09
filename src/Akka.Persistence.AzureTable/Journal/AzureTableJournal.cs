@@ -195,13 +195,13 @@ namespace Akka.Persistence.AzureTable.Journal
         private JournalEntry ToJournalEntry(IPersistentRepresentation message)
         {
             var payload = JsonConvert.SerializeObject(message.Payload);
-            return new JournalEntry(message.PersistenceId, message.SequenceNr, message.IsDeleted, payload, message.Manifest);
+            return new JournalEntry(message.PersistenceId, message.SequenceNr, message.IsDeleted, payload, message.Payload.GetType().TypeQualifiedNameForManifest());
         }
 
         private Persistent ToPersistenceRepresentation(JournalEntry entry, IActorRef sender)
         {
             var payload = JsonConvert.DeserializeObject(entry.Payload);
-            return new Persistent(payload, entry.SequenceNr, entry.PersistenceId, entry.Manifest, entry.IsDeleted, sender);
+            return new Persistent(payload, entry.SequenceNr, entry.PartitionKey, entry.Manifest, entry.IsDeleted, sender);
         }
     }
 }

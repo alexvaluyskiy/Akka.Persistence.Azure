@@ -21,14 +21,11 @@ namespace Akka.Persistence.AzureTable.Journal
             PartitionKey = persistenceId;
             RowKey = ToRowKey(sequenceNr);
 
-            PersistenceId = persistenceId;
             SequenceNr = sequenceNr;
             IsDeleted = isDeleted;
             Payload = payload;
             Manifest = manifest;
         }
-
-        public string PersistenceId { get; set; }
 
         public long SequenceNr { get; set; }
 

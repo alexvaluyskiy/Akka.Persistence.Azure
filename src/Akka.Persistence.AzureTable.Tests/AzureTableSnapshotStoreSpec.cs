@@ -38,6 +38,8 @@ namespace Akka.Persistence.AzureTable.Tests
         public AzureTableSnapshotStoreSpec(ITestOutputHelper output)
             : base(SpecConfig, typeof(AzureTableJournalSpec).Name, output)
         {
+            DbUtils.Clean(connectionString, tableName);
+
             AzureTablePersistence.Get(Sys);
             Initialize();
         }
