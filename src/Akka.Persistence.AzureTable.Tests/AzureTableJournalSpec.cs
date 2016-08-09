@@ -41,6 +41,9 @@ namespace Akka.Persistence.AzureTable.Tests
         public AzureTableJournalSpec(ITestOutputHelper output)
             : base(SpecConfig, typeof(AzureTableJournalSpec).Name, output)
         {
+            DbUtils.Clean(connectionString, tableName);
+            DbUtils.Clean(connectionString, metadataTableName);
+
             AzureTablePersistence.Get(Sys);
             Initialize();
         }

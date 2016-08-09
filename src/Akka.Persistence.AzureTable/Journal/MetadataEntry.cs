@@ -12,21 +12,15 @@ namespace Akka.Persistence.AzureTable.Journal
 {
     public class MetadataEntry : TableEntity
     {
-        public MetadataEntry()
-        {
-            
-        }
+        public MetadataEntry() { }
 
         public MetadataEntry(string persistenceId, long sequenceNr)
         {
             PartitionKey = persistenceId;
             RowKey = persistenceId;
 
-            PersistenceId = persistenceId;
             SequenceNr = sequenceNr;
         }
-
-        public string PersistenceId { get; set; }
 
         public long SequenceNr { get; set; }
     }

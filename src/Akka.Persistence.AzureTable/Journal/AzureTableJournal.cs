@@ -12,6 +12,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Persistence.Journal;
+using Akka.Util.Internal;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
@@ -48,6 +49,15 @@ namespace Akka.Persistence.AzureTable.Journal
         }
 
         // TODO: optimize query here
+        /// <summary>
+        /// Asynchronously replays persistent messages.
+        /// </summary>
+        /// <param name="context">The contextual information about the actor processing replayed messages.</param>
+        /// <param name="persistenceId">Persistent actor identifier</param>
+        /// <param name="fromSequenceNr">Inclusive sequence number where replay should start</param>
+        /// <param name="toSequenceNr">Inclusive sequence number where replay should end</param>
+        /// <param name="max">Maximum number of messages to be replayed</param>
+        /// <param name="recoveryCallback">Called to replay a message, may be called from any thread.</param>
         public override async Task ReplayMessagesAsync(
             IActorContext context,
             string persistenceId,
@@ -56,33 +66,44 @@ namespace Akka.Persistence.AzureTable.Journal
             long max,
             Action<IPersistentRepresentation> recoveryCallback)
         {
-            long count = 0;
-            if (max > 0 && (toSequenceNr - fromSequenceNr) >= 0)
-            {
-                IEnumerable<JournalEntry> results = _client.Value
-                    .GetTableReference(_settings.TableName)
-                    .ExecuteQuery(BuildReplayTableQuery(persistenceId, fromSequenceNr, toSequenceNr));
+            if (max == 0)
+                return;
 
-                foreach (JournalEntry @event in results)
+            long count = 0;
+
+            TableContinuationToken continuationToken = null;
+            var table = _client.Value.GetTableReference(_settings.TableName);
+            var tableQuery = BuildReplayTableQuery(persistenceId, fromSequenceNr, toSequenceNr);
+
+            do
+            {
+                var tableQueryResult = await table.ExecuteQuerySegmentedAsync(tableQuery, continuationToken);
+                continuationToken = tableQueryResult.ContinuationToken;
+
+                foreach (JournalEntry @event in tableQueryResult.Results)
                 {
-                    recoveryCallback(ToPersistenceRepresentation(@event, Context.Self));
+                    recoveryCallback(ToPersistenceRepresentation(@event, context.Self));
+
                     count++;
                     if (count == max) return;
                 }
-            }
+            } while (continuationToken != null);
         }
 
-        // TODO: optimize query here
+        /// <summary>
+        /// Asynchronously reads a highest sequence number of the event stream related with provided <paramref name="persistenceId"/>.
+        /// </summary>
+        /// <param name="persistenceId">Persistent actor identifier</param>
+        /// <param name="fromSequenceNr">Hint where to start searching for the highest sequence number</param>
         public override async Task<long> ReadHighestSequenceNrAsync(string persistenceId, long fromSequenceNr)
         {
             var table = _client.Value.GetTableReference(_settings.MetadataTableName);
 
-            var query = table.CreateQuery<MetadataEntry>()
-                .Where(c => c.PersistenceId == persistenceId)
-                .Select(c => c.SequenceNr)
-                .FirstOrDefault();
+            var tableResult = await table.ExecuteAsync(TableOperation.Retrieve<MetadataEntry>(persistenceId, persistenceId));
 
-            return query;
+            return tableResult.HttpStatusCode == 200 
+                ? tableResult.Result?.AsInstanceOf<MetadataEntry>()?.SequenceNr ?? 0 
+                : 0;
         }
 
         protected override async Task DeleteMessagesToAsync(string persistenceId, long toSequenceNr)
@@ -104,6 +125,7 @@ namespace Akka.Persistence.AzureTable.Journal
             }
         }
 
+        // TODO: optimize query here
         protected override async Task<IImmutableList<Exception>> WriteMessagesAsync(IEnumerable<AtomicWrite> messages)
         {
             var messageList = messages.ToList();
@@ -137,15 +159,17 @@ namespace Akka.Persistence.AzureTable.Journal
 
             var table = _client.Value.GetTableReference(_settings.MetadataTableName);
 
-            var metadata = table.CreateQuery<MetadataEntry>().Where(c => c.PersistenceId == persistenceId).FirstOrDefault();
+            var tableResult = await table.ExecuteAsync(TableOperation.Retrieve<MetadataEntry>(persistenceId, persistenceId));
 
-            if (metadata == null)
+            if (tableResult.HttpStatusCode != 200)
             {
                 await table.ExecuteAsync(TableOperation.Insert(new MetadataEntry(persistenceId, highSequenceId)));
             }
             else
             {
+                var metadata = tableResult.Result.AsInstanceOf<MetadataEntry>();
                 metadata.SequenceNr = highSequenceId;
+                
                 await table.ExecuteAsync(TableOperation.InsertOrReplace(metadata));
             }
         }
