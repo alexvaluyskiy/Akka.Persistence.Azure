@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+using System;
 using FluentAssertions;
 using Xunit;
 
@@ -32,6 +33,12 @@ namespace Akka.Persistence.AzureTable.Tests
             azurePersistence.SnapshotStoreSettings.ConnectionString.Should().Be("UseDevelopmentStorage=true");
             azurePersistence.SnapshotStoreSettings.TableName.Should().Be("snapshots");
             azurePersistence.SnapshotStoreSettings.AutoInitialize.Should().BeFalse();
+        }
+        [Fact]
+        public void AzureTable_AzureTableSettings_must_throw_an_error_on_empty_config()
+        {
+            Assert.Throws<ArgumentNullException>(() => AzureTableJournalSettings.Create(null));
+            Assert.Throws<ArgumentNullException>(() => AzureTableSnapshotStoreSettings.Create(null));
         }
     }
 }

@@ -11,9 +11,7 @@ namespace Akka.Persistence.AzureTable.Snapshot
 {
     public class SnapshotEntry : TableEntity
     {
-        public SnapshotEntry()
-        {
-        }
+        public SnapshotEntry() { }
 
         public SnapshotEntry(string persistenceId, long sequenceNr, long snapshotTimestamp, string manifest, string payload)
         {
@@ -36,11 +34,6 @@ namespace Akka.Persistence.AzureTable.Snapshot
         public string Manifest { get; set; }
 
         public string Payload { get; set; }
-
-        public static string ToRowKey(int version)
-        {
-            return version.ToString().PadLeft(10, '0');
-        }
 
         public static string ToRowKey(long version)
         {

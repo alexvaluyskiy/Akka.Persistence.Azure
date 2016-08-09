@@ -18,6 +18,7 @@ namespace Akka.Persistence.AzureTable.Tests
         {
             CloudTableClient tableClient = CloudStorageAccount.Parse(connectionString).CreateCloudTableClient();
             CloudTable table = tableClient.GetTableReference(tableName);
+            table.CreateIfNotExists();
             TableQuery<DynamicTableEntity> query = new TableQuery<DynamicTableEntity>();
             IEnumerable<DynamicTableEntity> results = table.ExecuteQuery(query);
             if (results.Count() > 0)

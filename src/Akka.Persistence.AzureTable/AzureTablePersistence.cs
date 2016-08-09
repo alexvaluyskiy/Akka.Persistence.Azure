@@ -11,14 +11,12 @@ using Akka.Configuration;
 
 namespace Akka.Persistence.AzureTable
 {
-    // TODO: divide to JournalSettings and to SnapshotStoreSettings
     public class AzureTableSettings
     {
-        public AzureTableSettings(string connectionString, string tableName, string metadataTableName, bool autoInitialize)
+        protected AzureTableSettings(string connectionString, string tableName, bool autoInitialize)
         {
             ConnectionString = connectionString;
             TableName = tableName;
-            MetadataTableName = metadataTableName;
             AutoInitialize = autoInitialize;
         }
 
@@ -26,19 +24,47 @@ namespace Akka.Persistence.AzureTable
 
         public string TableName { get; }
 
+        public bool AutoInitialize { get; }
+    }
+
+    public sealed class AzureTableJournalSettings : AzureTableSettings
+    {
+        private AzureTableJournalSettings(string connectionString, string tableName, string metadataTableName, bool autoInitialize)
+            : base(connectionString, tableName, autoInitialize)
+        {
+            MetadataTableName = metadataTableName;
+        }
+
         public string MetadataTableName { get; }
 
-        public bool AutoInitialize { get; }
-
-        public static AzureTableSettings Create(Config config)
+        public static AzureTableJournalSettings Create(Config config)
         {
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
 
-            return new AzureTableSettings(
+            return new AzureTableJournalSettings(
                 connectionString: config.GetString("connection-string"),
                 tableName: config.GetString("table-name"),
                 metadataTableName: config.GetString("metadata-table-name"),
+                autoInitialize: config.GetBoolean("auto-initialize"));
+        }
+    }
+
+    public sealed class AzureTableSnapshotStoreSettings : AzureTableSettings
+    {
+        private AzureTableSnapshotStoreSettings(string connectionString, string tableName, bool autoInitialize)
+            : base(connectionString, tableName, autoInitialize)
+        {
+        }
+
+        public static AzureTableSnapshotStoreSettings Create(Config config)
+        {
+            if (config == null)
+                throw new ArgumentNullException(nameof(config));
+
+            return new AzureTableSnapshotStoreSettings(
+                connectionString: config.GetString("connection-string"),
+                tableName: config.GetString("table-name"),
                 autoInitialize: config.GetBoolean("auto-initialize"));
         }
     }
@@ -48,16 +74,16 @@ namespace Akka.Persistence.AzureTable
         public static AzureTablePersistence Get(ActorSystem system) => system.WithExtension<AzureTablePersistence, AzureTablePersistenceProvider>();
         public static Config DefaultConfig() => ConfigurationFactory.FromResource<AzureTablePersistence>("Akka.Persistence.AzureTable.reference.conf");
 
-        public AzureTableSettings JournalSettings { get; }
+        public AzureTableJournalSettings JournalSettings { get; }
 
-        public AzureTableSettings SnapshotStoreSettings { get; }
+        public AzureTableSnapshotStoreSettings SnapshotStoreSettings { get; }
 
         public AzureTablePersistence(ExtendedActorSystem system)
         {
             system.Settings.InjectTopLevelFallback(DefaultConfig());
 
-            JournalSettings = AzureTableSettings.Create(system.Settings.Config.GetConfig("akka.persistence.journal.azure-table"));
-            SnapshotStoreSettings = AzureTableSettings.Create(system.Settings.Config.GetConfig("akka.persistence.snapshot-store.azure-table"));
+            JournalSettings = AzureTableJournalSettings.Create(system.Settings.Config.GetConfig("akka.persistence.journal.azure-table"));
+            SnapshotStoreSettings = AzureTableSnapshotStoreSettings.Create(system.Settings.Config.GetConfig("akka.persistence.snapshot-store.azure-table"));
         }
     }
 

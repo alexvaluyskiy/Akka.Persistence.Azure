@@ -5,7 +5,6 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
-using System;
 using Microsoft.WindowsAzure.Storage.Table;
 
 namespace Akka.Persistence.AzureTable.Journal

@@ -21,9 +21,8 @@ namespace Akka.Persistence.AzureTable.Journal
 {
     public class AzureTableJournal : AsyncWriteJournal
     {
-        private readonly AzureTableSettings _settings;
+        private readonly AzureTableJournalSettings _settings;
         private Lazy<CloudTableClient> _client;
-        private ActorSystem _system;
 
         public AzureTableJournal()
         {
@@ -33,7 +32,6 @@ namespace Akka.Persistence.AzureTable.Journal
         protected override void PreStart()
         {
             base.PreStart();
-            _system = Context.System;
             _client = new Lazy<CloudTableClient>(() =>
             {
                 CloudTableClient tableClient = CloudStorageAccount.Parse(_settings.ConnectionString).CreateCloudTableClient();

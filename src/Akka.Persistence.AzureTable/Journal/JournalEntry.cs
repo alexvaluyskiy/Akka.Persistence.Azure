@@ -14,10 +14,7 @@ namespace Akka.Persistence.AzureTable.Journal
     /// </summary>
     public class JournalEntry : TableEntity
     {
-        public JournalEntry()
-        {
-            
-        }
+        public JournalEntry() { }
 
         public JournalEntry(string persistenceId, long sequenceNr, bool isDeleted, string payload, string manifest)
         {

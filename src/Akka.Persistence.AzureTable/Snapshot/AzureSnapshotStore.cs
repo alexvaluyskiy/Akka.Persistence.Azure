@@ -6,24 +6,20 @@
 //-----------------------------------------------------------------------
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using Akka.Actor;
 using Akka.Persistence.Snapshot;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
-using Microsoft.WindowsAzure.Storage.Table.Queryable;
 using Newtonsoft.Json;
 
 namespace Akka.Persistence.AzureTable.Snapshot
 {
     public class AzureSnapshotStore : SnapshotStore
     {
-        private readonly AzureTableSettings _settings;
+        private readonly AzureTableSnapshotStoreSettings _settings;
         private Lazy<CloudTableClient> _client;
-        private ActorSystem _system;
 
         public AzureSnapshotStore()
         {
@@ -33,7 +29,6 @@ namespace Akka.Persistence.AzureTable.Snapshot
         protected override void PreStart()
         {
             base.PreStart();
-            _system = Context.System;
             _client = new Lazy<CloudTableClient>(() =>
             {
                 CloudTableClient tableClient = CloudStorageAccount.Parse(_settings.ConnectionString).CreateCloudTableClient();
