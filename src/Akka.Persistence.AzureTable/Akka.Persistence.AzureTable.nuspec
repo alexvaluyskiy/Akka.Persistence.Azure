@@ -13,7 +13,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <releaseNotes>@releaseNotes@</releaseNotes>
     <copyright>@copyright@</copyright>
-    <tags>@tags@ persistence eventsource azure</tags>
+    <tags>@tags@ persistence eventsource azure storage table</tags>
     @dependencies@
     @references@
   </metadata>

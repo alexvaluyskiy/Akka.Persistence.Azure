@@ -17,11 +17,10 @@ cd __SOURCE_DIRECTORY__
 //--------------------------------------------------------------------------------
 
 
-let product = "Akka.NET"
-let authors = [ "Akka.NET Team" ]
-let copyright = "Copyright © 2013-2016 Akka.NET Team"
-let company = "Akka.NET Team"
-let description = "Akka.NET is a port of the popular Java/Scala framework Akka to .NET"
+let product = "Akka.Persistence.Azure"
+let authors = [ "Alex Valuyskiy" ]
+let copyright = "Copyright © 2013-2016 Alex Valuyskiy"
+let company = "Alex Valuyskiy"
 let tags = ["akka";"actors";"actor";"model";"Akka";"concurrency"]
 let configuration = "Release"
 
@@ -191,7 +190,6 @@ let createNugetPackages _ =
             NuGetHelper.NuGet
                 (fun p ->
                     { p with
-                        Description = description
                         Authors = authors
                         Copyright = copyright
                         Project =  project
