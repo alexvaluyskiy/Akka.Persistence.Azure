@@ -18,16 +18,10 @@ namespace Akka.Persistence.AzureTable.Snapshot
             PartitionKey = persistenceId;
             RowKey = ToRowKey(sequenceNr);
 
-            PersistenceId = persistenceId;
-            SequenceNr = sequenceNr;
             SnapshotTimestamp = snapshotTimestamp;
             Manifest = manifest;
             Payload = payload;
         }
-
-        public string PersistenceId { get; set; }
-
-        public long SequenceNr { get; set; }
 
         public long SnapshotTimestamp { get; set; }
 

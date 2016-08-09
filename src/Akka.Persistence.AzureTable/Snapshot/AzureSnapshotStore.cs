@@ -8,7 +8,6 @@
 using System;
 using System.Linq;
 using System.Threading.Tasks;
-using Akka.Actor;
 using Akka.Persistence.Snapshot;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Table;
@@ -42,18 +41,27 @@ namespace Akka.Persistence.AzureTable.Snapshot
             });
         }
 
+        /// <summary>
+        /// Asynchronously loads a snapshot.
+        /// This call is protected with a circuit-breaker
+        /// </summary>
+        /// <param name="persistenceId">Persistent actor identifier</param>
         protected override async Task<SelectedSnapshot> LoadAsync(string persistenceId, SnapshotSelectionCriteria criteria)
         {
-            CloudTable table = _client.Value.GetTableReference(_settings.TableName);
+            var table = _client.Value.GetTableReference(_settings.TableName);
 
             var query = BuildSnapshotTableQuery(persistenceId, criteria);
 
-            return table.ExecuteQuery(query).OrderByDescending(t => t.SequenceNr).Select(ToSelectedSnapshot).FirstOrDefault();
+            return table.ExecuteQuery(query).OrderByDescending(t => t.RowKey).Select(ToSelectedSnapshot).FirstOrDefault();
         }
 
+        /// <summary>
+        /// Asynchronously saves a snapshot.
+        /// This call is protected with a circuit-breaker
+        /// </summary>
         protected override Task SaveAsync(SnapshotMetadata metadata, object snapshot)
         {
-            CloudTable table = _client.Value.GetTableReference(_settings.TableName);
+            var table = _client.Value.GetTableReference(_settings.TableName);
 
             TableOperation upsertOperation = TableOperation.Insert(ToSnapshotEntry(metadata, snapshot));
 
@@ -67,21 +75,30 @@ namespace Akka.Persistence.AzureTable.Snapshot
             return table.ExecuteAsync(upsertOperation);
         }
 
+        /// <summary>
+        /// Deletes the snapshot identified by <paramref name="metadata" />.
+        /// This call is protected with a circuit-breaker
+        /// </summary>
         protected override Task DeleteAsync(SnapshotMetadata metadata)
         {
-            CloudTable table = _client.Value.GetTableReference(_settings.TableName);
+            var table = _client.Value.GetTableReference(_settings.TableName);
             TableOperation getOperation = TableOperation.Retrieve<SnapshotEntry>(metadata.PersistenceId, SnapshotEntry.ToRowKey(metadata.SequenceNr));
             TableResult result = table.Execute(getOperation);
             TableOperation deleteOperation = TableOperation.Delete((SnapshotEntry)result.Result);
             return table.ExecuteAsync(deleteOperation);
         }
 
+        /// <summary>
+        /// Deletes all snapshots matching provided <paramref name="criteria" />.
+        /// This call is protected with a circuit-breaker
+        /// </summary>
+        /// <param name="persistenceId">Persistent actor identifier</param>
         protected override async Task DeleteAsync(string persistenceId, SnapshotSelectionCriteria criteria)
         {
-            CloudTable table = _client.Value.GetTableReference(_settings.TableName);
+            var table = _client.Value.GetTableReference(_settings.TableName);
             TableQuery<SnapshotEntry> query = BuildSnapshotTableQuery(persistenceId, criteria);
 
-            var results = table.ExecuteQuery(query).OrderByDescending(t => t.SequenceNr).ToList();
+            var results = table.ExecuteQuery(query).OrderByDescending(t => t.RowKey).ToList();
             if (results.Count > 0)
             {
                 TableBatchOperation batchOperation = new TableBatchOperation();
@@ -98,7 +115,7 @@ namespace Akka.Persistence.AzureTable.Snapshot
             string comparsion = TableQuery.CombineFilters(
                 TableQuery.GenerateFilterCondition("PartitionKey", QueryComparisons.Equal, persistenceId),
                 TableOperators.And,
-                TableQuery.GenerateFilterConditionForLong("SequenceNr", QueryComparisons.LessThanOrEqual, criteria.MaxSequenceNr));
+                TableQuery.GenerateFilterCondition("RowKey", QueryComparisons.LessThanOrEqual, SnapshotEntry.ToRowKey(criteria.MaxSequenceNr)));
 
             if (criteria.MaxTimeStamp != DateTime.MinValue && criteria.MaxTimeStamp != DateTime.MaxValue)
             {
@@ -120,7 +137,7 @@ namespace Akka.Persistence.AzureTable.Snapshot
         private static SelectedSnapshot ToSelectedSnapshot(SnapshotEntry entry)
         {
             var payload = JsonConvert.DeserializeObject(entry.Payload, Type.GetType(entry.Manifest));
-            return new SelectedSnapshot(new SnapshotMetadata(entry.PersistenceId, entry.SequenceNr, new DateTime(entry.SnapshotTimestamp)), payload);
+            return new SelectedSnapshot(new SnapshotMetadata(entry.PartitionKey, long.Parse(entry.RowKey), new DateTime(entry.SnapshotTimestamp)), payload);
         }
     }
 }

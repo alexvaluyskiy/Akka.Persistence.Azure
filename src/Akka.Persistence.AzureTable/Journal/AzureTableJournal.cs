@@ -46,7 +46,6 @@ namespace Akka.Persistence.AzureTable.Journal
             });
         }
 
-        // TODO: optimize query here
         /// <summary>
         /// Asynchronously replays persistent messages.
         /// </summary>
@@ -104,11 +103,16 @@ namespace Akka.Persistence.AzureTable.Journal
                 : 0;
         }
 
+        /// <summary>
+        /// Asynchronously deletes all persistent messages up to inclusive <paramref name="toSequenceNr" /> bound.
+        /// </summary>
+        /// <param name="persistenceId">Persistent actor identifier</param>
         protected override async Task DeleteMessagesToAsync(string persistenceId, long toSequenceNr)
         {
-            IEnumerable<JournalEntry> results = _client.Value
-                    .GetTableReference(_settings.TableName)
-                    .ExecuteQuery(BuildDeleteTableQuery(persistenceId, toSequenceNr)).OrderByDescending(t => t.SequenceNr);
+            // TODO: optimize the query
+            IEnumerable<JournalEntry> results = _client.Value.GetTableReference(_settings.TableName)
+                    .ExecuteQuery(BuildDeleteTableQuery(persistenceId, toSequenceNr))
+                    .OrderByDescending(t => t.RowKey);
 
             if (results.Any())
             {
@@ -123,13 +127,22 @@ namespace Akka.Persistence.AzureTable.Journal
             }
         }
 
-        // TODO: optimize query here
+        /// <summary>
+        /// Asynchronously writes a batch of persistent messages to the journal.
+        /// </summary>
+        /// <param name="messages">The atomic messages.</param>
+        /// <returns></returns>
         protected override async Task<IImmutableList<Exception>> WriteMessagesAsync(IEnumerable<AtomicWrite> messages)
         {
-            var messageList = messages.ToList();
-            var writeTasks = messageList.Select(async message =>
+            var table = _client.Value.GetTableReference(_settings.TableName);
+
+            var messagesList = messages.ToList();
+            var groupedTasks = messagesList.GroupBy(x => x.PersistenceId).ToDictionary(g => g.Key, async g =>
             {
-                var persistentMessages = ((IImmutableList<IPersistentRepresentation>)message.Payload).ToArray();
+                var persistentMessages = g.SelectMany(aw => (IImmutableList<IPersistentRepresentation>)aw.Payload).ToList();
+
+                var persistenceId = g.Key;
+                var highSequenceId = persistentMessages.Max(c => c.SequenceNr);
 
                 var batchOperation = new TableBatchOperation();
 
@@ -138,37 +151,37 @@ namespace Akka.Persistence.AzureTable.Journal
                     batchOperation.Insert(ToJournalEntry(write));
                 }
 
-                await _client.Value.GetTableReference(_settings.TableName).ExecuteBatchAsync(batchOperation);
+                await table.ExecuteBatchAsync(batchOperation);
+
+                await SetHighestSequenceId(persistenceId, highSequenceId);
             });
 
-            await SetHighestSequenceId(messageList);
-
-            return await Task<IImmutableList<Exception>>
-                .Factory
-                .ContinueWhenAll(writeTasks.ToArray(),
-                    tasks => tasks.Select(t => t.IsFaulted ? TryUnwrapException(t.Exception) : null).ToImmutableList());
+            return await Task<IImmutableList<Exception>>.Factory.ContinueWhenAll(
+                    groupedTasks.Values.ToArray(),
+                    tasks => messagesList.Select(
+                        m =>
+                        {
+                            var task = groupedTasks[m.PersistenceId];
+                            return task.IsFaulted ? TryUnwrapException(task.Exception) : null;
+                        }).ToImmutableList());
         }
 
-        // TODO: optimize query here
-        private async Task SetHighestSequenceId(IList<AtomicWrite> messages)
+        private async Task SetHighestSequenceId(string persistenceId, long highSequenceId)
         {
-            var persistenceId = messages.Select(c => c.PersistenceId).First();
-            var highSequenceId = messages.Max(c => c.HighestSequenceNr);
-
             var table = _client.Value.GetTableReference(_settings.MetadataTableName);
 
             var tableResult = await table.ExecuteAsync(TableOperation.Retrieve<MetadataEntry>(persistenceId, persistenceId));
 
-            if (tableResult.HttpStatusCode != 200)
+            MetadataEntry metadataEntry = tableResult.Result as MetadataEntry;
+
+            if (metadataEntry != null)
             {
-                await table.ExecuteAsync(TableOperation.Insert(new MetadataEntry(persistenceId, highSequenceId)));
+                metadataEntry.SequenceNr = highSequenceId;
+                await table.ExecuteAsync(TableOperation.Replace(metadataEntry));
             }
             else
             {
-                var metadata = tableResult.Result.AsInstanceOf<MetadataEntry>();
-                metadata.SequenceNr = highSequenceId;
-                
-                await table.ExecuteAsync(TableOperation.InsertOrReplace(metadata));
+                await table.ExecuteAsync(TableOperation.Insert(new MetadataEntry(persistenceId, highSequenceId)));
             }
         }
 
@@ -195,13 +208,13 @@ namespace Akka.Persistence.AzureTable.Journal
         private JournalEntry ToJournalEntry(IPersistentRepresentation message)
         {
             var payload = JsonConvert.SerializeObject(message.Payload);
-            return new JournalEntry(message.PersistenceId, message.SequenceNr, message.IsDeleted, payload, message.Payload.GetType().TypeQualifiedNameForManifest());
+            return new JournalEntry(message.PersistenceId, message.SequenceNr, payload, message.Payload.GetType().TypeQualifiedNameForManifest());
         }
 
         private Persistent ToPersistenceRepresentation(JournalEntry entry, IActorRef sender)
         {
             var payload = JsonConvert.DeserializeObject(entry.Payload);
-            return new Persistent(payload, entry.SequenceNr, entry.PartitionKey, entry.Manifest, entry.IsDeleted, sender);
+            return new Persistent(payload, long.Parse(entry.RowKey), entry.PartitionKey, entry.Manifest, false, sender);
         }
     }
 }

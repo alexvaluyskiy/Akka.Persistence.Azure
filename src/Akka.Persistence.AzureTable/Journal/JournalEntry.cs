@@ -16,20 +16,14 @@ namespace Akka.Persistence.AzureTable.Journal
     {
         public JournalEntry() { }
 
-        public JournalEntry(string persistenceId, long sequenceNr, bool isDeleted, string payload, string manifest)
+        public JournalEntry(string persistenceId, long sequenceNr, string payload, string manifest)
         {
             PartitionKey = persistenceId;
             RowKey = ToRowKey(sequenceNr);
 
-            SequenceNr = sequenceNr;
-            IsDeleted = isDeleted;
             Payload = payload;
             Manifest = manifest;
         }
-
-        public long SequenceNr { get; set; }
-
-        public bool IsDeleted { get; set; }
 
         public string Payload { get; set; }
 
