@@ -4,5 +4,5 @@ using System.Reflection;
 [assembly: AssemblyCompanyAttribute("Alex Valuyskiy")]
 [assembly: AssemblyCopyrightAttribute("Copyright © 2013-2016 Alex Valuyskiy")]
 [assembly: AssemblyTrademarkAttribute("")]
-[assembly: AssemblyVersionAttribute("0.1.0.0")]
-[assembly: AssemblyFileVersionAttribute("0.1.0.0")]
+[assembly: AssemblyVersionAttribute("0.1.1.0")]
+[assembly: AssemblyFileVersionAttribute("0.1.1.0")]

@@ -5,6 +5,7 @@
 // </copyright>
 //-----------------------------------------------------------------------
 
+using System;
 using Akka.Configuration;
 using Akka.Persistence.TestKit.Snapshot;
 using Xunit;
@@ -16,29 +17,35 @@ namespace Akka.Persistence.AzureTable.Tests
     public class AzureTableSnapshotStoreSpec : SnapshotStoreSpec
     {
         private static readonly Config SpecConfig;
-        private static string connectionString;
-        private static string tableName;
+        private static string _connectionString;
+        private static string _tableName;
 
         static AzureTableSnapshotStoreSpec()
         {
+#if CI
+            var connectionString = Environment.GetEnvironmentVariable("ConnectionString");
+#else
+            var connectionString = "UseDevelopmentStorage=true;";
+#endif
+
             SpecConfig = ConfigurationFactory.ParseString(@"
-                akka.test.single-expect-default = 25s
+                akka.test.single-expect-default = 10s
                 akka.persistence {
                     publish-plugin-commands = on
                     snapshot-store.plugin = ""akka.persistence.snapshot-store.azure-table""
-                    snapshot-store.azure-table.connection-string = ""UseDevelopmentStorage=true""
+                    snapshot-store.azure-table.connection-string = """ + connectionString + @"""
                     snapshot-store.azure-table.auto-initialize = on
                     snapshot-store.azure-table.table-name = snapshots
                 }");
 
-            connectionString = SpecConfig.GetString("akka.persistence.snapshot-store.azure-table.connection-string");
-            tableName = SpecConfig.GetString("akka.persistence.snapshot-store.azure-table.table-name");
+            _connectionString = SpecConfig.GetString("akka.persistence.snapshot-store.azure-table.connection-string");
+            _tableName = SpecConfig.GetString("akka.persistence.snapshot-store.azure-table.table-name");
         }
 
         public AzureTableSnapshotStoreSpec(ITestOutputHelper output)
             : base(SpecConfig, typeof(AzureTableJournalSpec).Name, output)
         {
-            DbUtils.Clean(connectionString, tableName);
+            DbUtils.Clean(_connectionString, _tableName);
 
             AzureTablePersistence.Get(Sys);
             Initialize();
@@ -47,7 +54,7 @@ namespace Akka.Persistence.AzureTable.Tests
         protected override void Dispose(bool disposing)
         {
             base.Dispose(disposing);
-            DbUtils.Clean(connectionString, tableName);
+            DbUtils.Clean(_connectionString, _tableName);
         }
     }
 }

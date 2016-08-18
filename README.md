@@ -1,4 +1,4 @@
-# Akka.Persistence.Azure [![NuGet Pre Release](https://img.shields.io/badge/nuget-0.1.0-yellow.svg)](https://www.nuget.org/packages/Akka.Persistence.AzureTable/)
+# Akka.Persistence.Azure [![Build status](https://ci.appveyor.com/api/projects/status/dae4cjq4k05puly8/branch/dev?svg=true)](https://ci.appveyor.com/project/ravengerUA/akka-persistence-azure/branch/dev) [![NuGet Pre Release](https://img.shields.io/badge/nuget-0.1.1-yellow.svg)](https://www.nuget.org/packages/Akka.Persistence.AzureTable/)
 
 Akka Persistence journal and snapshot store backed by Azure Table database.
 
