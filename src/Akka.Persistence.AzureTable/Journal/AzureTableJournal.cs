@@ -211,9 +211,9 @@ namespace Akka.Persistence.AzureTable.Journal
             return new JournalEntry(message.PersistenceId, message.SequenceNr, payload, message.Payload.GetType().TypeQualifiedNameForManifest());
         }
 
-        private Persistent ToPersistenceRepresentation(JournalEntry entry, IActorRef sender)
+        private static Persistent ToPersistenceRepresentation(JournalEntry entry, IActorRef sender)
         {
-            var payload = JsonConvert.DeserializeObject(entry.Payload);
+            var payload = JsonConvert.DeserializeObject(entry.Payload, Type.GetType(entry.Manifest));
             return new Persistent(payload, long.Parse(entry.RowKey), entry.PartitionKey, entry.Manifest, false, sender);
         }
     }
